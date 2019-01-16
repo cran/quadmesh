@@ -4,15 +4,24 @@
 \alias{mesh_plot}
 \alias{mesh_plot.BasicRaster}
 \alias{mesh_plot.RasterLayer}
+\alias{mesh_plot.TRI}
+\alias{mesh_plot.quadmesh}
 \title{Plot as a mesh}
 \usage{
-mesh_plot(x, crs = NULL, colfun = NULL, add = FALSE, ...)
+mesh_plot(x, crs = NULL, colfun = NULL, add = FALSE, ...,
+  coords = NULL)
 
 \method{mesh_plot}{BasicRaster}(x, crs = NULL, colfun = NULL,
-  add = FALSE, ...)
+  add = FALSE, ..., coords = NULL)
 
 \method{mesh_plot}{RasterLayer}(x, crs = NULL, colfun = NULL,
-  add = FALSE, ...)
+  add = FALSE, ..., coords = NULL)
+
+\method{mesh_plot}{TRI}(x, crs = NULL, colfun = NULL, add = FALSE,
+  ..., coords = NULL)
+
+\method{mesh_plot}{quadmesh}(x, crs = NULL, colfun = NULL,
+  add = FALSE, ..., coords = NULL)
 }
 \arguments{
 \item{x}{object to convert to mesh and plot}
@@ -24,6 +33,8 @@ mesh_plot(x, crs = NULL, colfun = NULL, add = FALSE, ...)
 \item{add}{add to existing plot or start a new one}
 
 \item{...}{ignored}
+
+\item{coords}{optional input raster of coordinates of each cell, see details}
 }
 \value{
 nothing, used for the side-effect of creating or adding to a plot
@@ -37,12 +48,21 @@ define the target map projection in 'PROJ string' format. (There is no
 "reproject" function for quadmesh, this is performed directly on the x-y
 coordinates of the 'quadmesh' output). The 'colfun' argument is used to
 generate colours which are mapped to the input object data as in 'image'.
+
+If `coords` is supplied, it is currently assumed to be a 2-layer `RasterBrick` with
+longitude and latitude as the *cell values*. These are used to geographically locate
+the resulting mesh, and will be transformed to the `crs` if that is supplied. This is
+modelled on the approach to curvilinear grid data used in the `angstroms` package. There
+the function [angstroms::romsmap()] and [angstroms::romscoords()] are used to separate the complicated
+grid geometry from the grid data itself. A small fudge is applied to extend the coordinates
+by 1 cell to avoid losing any data due to the half cell outer margin (get in touch if this causes problems!).
 }
 \examples{
-mesh_plot(worldll)
+##mesh_plot(worldll)
 ## crop otherwise out of bounds from PROJ
-mesh_plot(raster::crop(worldll, raster::extent(-179, 179, -89, 89)), crs = "+proj=laea")
-mesh_plot(worldll, crs = "+proj=moll")
+rr <- raster::crop(worldll, raster::extent(-179, 179, -89, 89))
+mesh_plot(rr, crs = "+proj=laea +datum=WGS84")
+mesh_plot(worldll, crs = "+proj=moll +datum=WGS84")
 prj <- "+proj=lcc +datum=WGS84 +lon_0=147 +lat_0=-40 +lat_1=-55 +lat_2=-20"
 mesh_plot(etopo, crs = prj, add = FALSE, colfun = function(n = 20) grey(seq(0, 1, length = n)))
 mesh_plot(worldll, crs = prj, add = TRUE)

@@ -1,3 +1,36 @@
+# quadmesh 0.3.0
+
+* Now using the `reproj` package for coordinate transformations. 
+
+* New `mesh_plot()` method for `TRI` objects from silicate/anglr. 
+
+* New function `dquadmesh` to provide the discrete interpretation of a grid. 
+
+* New function `bary_index` to provide a basis for interpolation of a regular grid
+ from triangles. 
+
+* New functions `triangmesh()` and `dtriangmesh` to provide the triangle-interpretation of a raster (bound to  centre coordinates). 
+ 
+* `quadmesh()` is now generic with a new method for 'matrix'. 
+
+* Some fixes and additional features for `mesh_plot()` to allow plotting with
+ curvilinear `coords`. 
+
+* New function `qm_as_raster` to round-trip to a RasterLayer. 
+
+* The `z` argument of `quadmesh()` may now have a different coordinate system to the 
+ input data `x`.  The mesh coordinates of `x` are silently reprojected if needed and
+  used to extract values in the native coordinate system of `z`. 
+ 
+* A new `qsc` function to return a very simple six quad rendition of the Quadrilateralized Spherical Cube 
+ projection family. 
+ 
+* The `mesh_plot` function gains true curvilinear grid support by allowing input of `coords`, a two-layer
+ raster of longitude and latitude values for the cell geography. This aligns with the approach used in the
+ `angstroms` package. 
+
+* The `quadmesh` function gains a new argument 'texture_filename' to control the output PNG file. 
+
 # quadmesh 0.2.0
 
 * The `quadmesh` functions gains a `texture` argument, to map on a 
