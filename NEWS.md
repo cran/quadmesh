@@ -1,3 +1,26 @@
+# quadmesh 0.4.5
+
+* Moved large examples/ folder from inst/ to data-raw/ to avoid it being installed. 
+
+* Remove failing test comparing unimportant differences in geocentric transformation. 
+
+* quadmesh now works with upcoming release of reproj (> 0.4.0). 
+
+* Fixed failing CRAN test by internalizing use of hcl.colors(). 
+
+* `mesh_plot()` now has a method for mesh3d. Intention is
+ to use mesh3d as the common basis for mesh_plot(). 
+* WIP new `use_crs()` facility to set the projection in use when setting up a `mesh_plot`. Subsequent calls to `mesh_plot(, add = TRUE)` will automatically project to the coordinate system
+ in use. `use_crs()` will set or get the PROJ string. 
+
+* New feature in `quadmesh()` to auto-expand a palette raster to the required RGB brick
+ for the `texture` argument.  Motivated by 
+ https://gis.stackexchange.com/questions/324552/creating-3d-image-from-hgt-files. 
+ 
+* Simplified use of `reproj()` by relying on upcoming new version. 
+
+* Function `mesh_plot()` now handles stars objects, only plotting the first x-y slice. 
+
 # quadmesh 0.4.0
 
 * Fixed bug is `mesh3d` creation, partial naming of `material$color` caused various problems. 

@@ -8,20 +8,29 @@
 \alias{quadmesh.matrix}
 \title{Create a quad-type mesh for use in rgl.}
 \usage{
-dquadmesh(x, z = x, na.rm = FALSE, ..., texture = NULL,
-  texture_filename = NULL)
+dquadmesh(
+  x,
+  z = x,
+  na.rm = FALSE,
+  ...,
+  texture = NULL,
+  texture_filename = NULL
+)
 
-\method{dquadmesh}{default}(x, z = x, na.rm = FALSE, ...,
-  texture = NULL, texture_filename = NULL)
+\method{dquadmesh}{default}(
+  x,
+  z = x,
+  na.rm = FALSE,
+  ...,
+  texture = NULL,
+  texture_filename = NULL
+)
 
-quadmesh(x, z = x, na.rm = FALSE, ..., texture = NULL,
-  texture_filename = NULL)
+quadmesh(x, z = x, na.rm = FALSE, ..., texture = NULL, texture_filename = NULL)
 
-\method{quadmesh}{BasicRaster}(x, z = x, na.rm = FALSE, ...,
-  texture = NULL, texture_filename = NULL)
+\method{quadmesh}{BasicRaster}(x, z = x, na.rm = FALSE, ..., texture = NULL, texture_filename = NULL)
 
-\method{quadmesh}{matrix}(x, z = x, na.rm = FALSE, ...,
-  texture = NULL, texture_filename = NULL)
+\method{quadmesh}{matrix}(x, z = x, na.rm = FALSE, ..., texture = NULL, texture_filename = NULL)
 }
 \arguments{
 \item{x}{raster object for mesh structure}
@@ -59,7 +68,9 @@ numeric value, or another raster. If the coordinate system of \code{z} and \code
 are queried by reprojection.
 
 Any raster RGB object (3-layers, ranging in 0-255) may be used as
-a \emph{texture} on the resulting mesh3d object.
+a \emph{texture} on the resulting mesh3d object. If \code{texture} is a palette raster it will be
+auto-expanded to RGB.
+
 It is not possible to provide rgl with an object of data for texture, it must be a PNG file and so
 the in-memory \code{texture} argument is written out to PNG file (with a message). The location of the file
 may be set explicitly with \code{texture_filename}.  Currently it's not possible to not use the \code{texture} object

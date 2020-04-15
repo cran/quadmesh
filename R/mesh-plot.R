@@ -10,8 +10,8 @@ scl <- function(x) {
 #' The mesh may be reprojected prior to plotting using the 'crs' argument to
 #' define the target map projection in 'PROJ string' format. (There is no
 #' "reproject" function for quadmesh, this is performed directly on the x-y
-#' coordinates of the 'quadmesh' output). The 'colfun' argument is used to
-#' generate colours which are mapped to the input object data as in 'image'.
+#' coordinates of the 'quadmesh' output). The 'col' argument are mapped to the input pplied
+#' object data as in 'image', and applied relative to 'zlim' if su.
 #'
 #' If `coords` is supplied, it is currently assumed to be a 2-layer `RasterBrick` with
 #' longitude and latitude as the *cell values*. These are used to geographically locate
@@ -23,7 +23,7 @@ scl <- function(x) {
 #'
 #' @param x object to convert to mesh and plot
 #' @param crs target map projection
-#' @param colfun colour function to use, `viridis` is the default
+#' @param col colours to use, defaults to that used by [graphics::image()]
 #' @param add add to existing plot or start a new one
 #' @param zlim absolute range of data to use for colour scaling (if `NULL` the data range is used)
 #' @param ... passed through to `base::plot`
@@ -31,30 +31,32 @@ scl <- function(x) {
 #' @return nothing, used for the side-effect of creating or adding to a plot
 #' @export
 #' @importFrom scales rescale
+#' @importFrom grDevices colorRampPalette
 #' @examples
-#' ##mesh_plot(worldll)
-#' ## crop otherwise out of bounds from PROJ
+#' mesh_plot(worldll)
 #' rr <- raster::crop(worldll, raster::extent(-179, 179, -89, 89))
 #' mesh_plot(rr, crs = "+proj=laea +datum=WGS84")
-#' mesh_plot(worldll, crs = "+proj=moll +datum=WGS84")
-#' prj <- "+proj=lcc +datum=WGS84 +lon_0=147 +lat_0=-40 +lat_1=-55 +lat_2=-20"
-#' mesh_plot(etopo, crs = prj, add = FALSE, colfun = function(n = 20) grey(seq(0, 1, length = n)))
-#' mesh_plot(worldll, crs = prj, add = TRUE)
-mesh_plot <- function(x, crs = NULL, colfun = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
+mesh_plot <- function(x, crs = NULL, col = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
+  message("quadmesh::mesh_plot() is to be deprecated\n a future release will use the 'anglr' package, soon to be on CRAN")
   UseMethod("mesh_plot")
 }
 #' @name mesh_plot
 #' @export
-mesh_plot.BasicRaster <- function(x, crs = NULL, colfun = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
+mesh_plot.BasicRaster <- function(x, crs = NULL, col = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
   if (raster::nlayers(x) > 1L) warning("extracting single RasterLayer from multilayered input")
-  mesh_plot(x[[1]], crs = crs, colfun = colfun, add = add, zlim = zlim, ..., coords = coords)
+  mesh_plot(x[[1]], crs = crs, col = col, add = add, zlim = zlim, ..., coords = coords)
 }
 #debug <- TRUE
 #' @name mesh_plot
 #' @export
-mesh_plot.RasterLayer <- function(x, crs = NULL, colfun = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
+mesh_plot.RasterLayer <- function(x, crs = NULL, col = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
+
+  if (add && is.null(crs)) crs <- use_crs()
+  if (!is.null(crs)) use_crs(crs) else use_crs(raster::projection(x))
+
   qm <- quadmesh::quadmesh(x, na.rm = FALSE)
- if (is.null(colfun)) colfun <- viridis::viridis
+
+  if (is.null(col)) col <- .hcl_colors
   ib <- qm$ib
   ## take the coordinates as given
   xy <- t(qm$vb[1:2, ])
@@ -65,23 +67,7 @@ mesh_plot.RasterLayer <- function(x, crs = NULL, colfun = NULL, add = FALSE, zli
     cells <- raster::cellFromXY(coords_fudge, xy)
     xy <- raster::extract(coords_fudge, cells)
   }
-  isLL <- raster::isLonLat(x) || !is.null(coords)  ## we just assume it's longlat if coords given
-  if (!is.null(crs) ) {
-    if (!raster::isLonLat(crs)) {
-      isLL <- FALSE
-    }
-  }
-  srcproj <- raster::projection(x)
-  if (is.na(srcproj) && !is.null(crs)) {
-    if (is.null(coords)) {
-      stop("no projection defined on input raster, and no 'coords' provided - \n either set the CRS of the raster, or supply a two-layer 'coords' brick with longitude and latitude layers")
-    } else {
-      message("coords and crs provided, assuming coords is Longitude, Latitude")
-      srcproj <- "+proj=longlat +datum=WGS84"
-    }
-  }
-  xy <- target_coordinates(xy, src.proj = srcproj, target = crs, xyz = FALSE)
-  ## we have to remove any infinite vertices
+  xy <- reproj::reproj(xy, target = use_crs(), source = qm$crs)
   ## as this affects the entire thing
   bad <- !is.finite(xy[,1]) | !is.finite(xy[,2])
   ## but we must identify the bad xy in the index
@@ -94,7 +80,8 @@ mesh_plot.RasterLayer <- function(x, crs = NULL, colfun = NULL, add = FALSE, zli
 
   ## we also have to deal with any values that are NA
   ## because they propagate to destroy the id
-  cols <- if (is.null(zlim)) colfun(100)[scl(values(x)) * 99 + 1] else colfun(100)[scales::rescale(values(x), c(1, 100), zlim)]
+  lc <- length(col)
+  cols <- if (is.null(zlim)) col[scales::rescale(values(x), c(1, lc))] else col[scales::rescale(values(x), c(1, lc), zlim)]
   if (any(is.na(cols))) {
     colsna <- rep(cols, each = nrow(ib))
     bad2 <- is.na(colsna)
@@ -125,12 +112,67 @@ mesh_plot.RasterLayer <- function(x, crs = NULL, colfun = NULL, add = FALSE, zli
   invisible(NULL)
 }
 
+#' @name mesh_plot
+#' @export
+mesh_plot.stars <- function(x,  crs = NULL, col = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
 
+  if (add && is.null(crs)) crs <- use_crs()
+  if (!is.null(crs)) use_crs(crs) else use_crs(raster::projection(x))
+
+   attr(x[[1]], "units") <- NULL
+  class(x[[1]]) <- "array"
+  dm <- dim(x[[1]])
+  if (length(dm) == 2) r <- raster::raster(t(x[[1]]))
+  if (length(dm) == 3) r <- raster::raster(t(x[[1]][,,1L, drop = TRUE]))
+  if (length(dm) == 4) r <- raster::raster(t(x[[1]][,,1L, 1L, drop = TRUE]))
+  if (length(dm) == 5) r <- raster::raster(t(x[[1]][,,1L, 1L, 1L, drop = TRUE]))
+   ## etc, do your own slicing ...
+
+
+  #r <- raster::setExtent(r, raster::extent(0, ncol(r), 0, nrow(r)))
+  if (is.null(coords) ) {
+    dims <- attr(x, "dimensions")
+    #r <- raster::setExtent(r, raster::extent(0, ncol(r), 0, nrow(r)))
+    if (attr(attr(x, "dimensions"), "raster")$curvilinear) {
+      coords <- raster::t(raster::setExtent(raster::brick(raster::raster(dims[[1]]$values), raster::raster(dims[[2]]$values)),
+                             raster::extent(r)))
+    } else {
+
+
+      #dims[[1]]
+      offs <- c(dims[[1]]$offset, dims[[2]]$offset)
+      del <- c(dims[[1]]$delta, dims[[2]]$delta)
+      if (any(is.na(offs))) {
+        ## rectilinear case
+        X <- if (is.na(offs[1])) dims[[1]]$values else seq(offs[1], by = del[1], length.out = ncol(r))
+        Y <- if (is.na(offs[2])) dims[[2]]$values else sort(seq(offs[2], by = del[2], length.out = nrow(r)))
+#        if (flip_y) Y <- rev(Y)
+        xy <- expand.grid(X, Y)
+        coords <- raster::setValues(raster::brick(raster::raster(r), raster::raster(r)),
+                                    as.matrix(xy))
+
+      } else {
+        ## regular case
+      ylim <- sort(c(offs[2], offs[2] + nrow(r) * del[2]))
+      ext <- raster::extent(offs[1], offs[1] + ncol(r) * del[1],
+                            ylim[1], ylim[2])
+      raster::projection(r) <- dims[[1]]$refsys
+      r <- raster::setExtent(r, ext)
+      }
+    }
+  }
+ # browser()
+  mesh_plot(r, crs = crs, coords = coords, col = col, add = add, zlim = zlim, ...)
+}
 
 #' @name mesh_plot
 #' @export
-mesh_plot.TRI <- function(x, crs = NULL, colfun = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
-  if (is.null(colfun)) colfun <- viridis::viridis
+mesh_plot.TRI <- function(x, crs = NULL, col = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
+
+  if (add && is.null(crs)) crs <- use_crs()
+  if (!is.null(crs)) use_crs(crs) else use_crs(raster::projection(x))
+
+   if (is.null(col)) col <- .hcl_colors
   idx <- matrix(match(t(as.matrix(x$triangle[c(".vx0", ".vx1", ".vx2")])),
                      x$vertex$vertex_), nrow = 3)
   ## take the coordinates as given
@@ -156,7 +198,7 @@ mesh_plot.TRI <- function(x, crs = NULL, colfun = NULL, add = FALSE, zlim = NULL
   ## we also have to deal with any values that are NA
   ## because they propagate to destroy the id
   #browser()
-  cols <- colfun(nrow(x$object))[factor(x$triangle$object_)]
+  cols <- colorRampPalette(col)(nrow(x$object))[factor(x$triangle$object_)]
   if (any(is.na(cols))) {
     colsna <- rep(cols, each = nrow(idx))
     bad2 <- is.na(colsna)
@@ -189,9 +231,15 @@ isLL <- FALSE
 #debug <- TRUE
 #' @name mesh_plot
 #' @export
-mesh_plot.quadmesh <- function(x, crs = NULL, colfun = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
-  qm <- x
-  if (is.null(colfun)) colfun <- viridis::viridis
+mesh_plot.quadmesh <- function(x, crs = NULL, col = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
+
+  srcproj <- x$crs
+  if (add && is.null(crs)) crs <- use_crs()
+  if (!is.null(crs)) use_crs(crs) else use_crs(srcproj)
+
+
+   qm <- x
+  if (is.null(col)) col <- .hcl_colors
   ib <- qm$ib
   ## take the coordinates as given
   xy <- t(qm$vb[1:2, ])
@@ -208,7 +256,7 @@ mesh_plot.quadmesh <- function(x, crs = NULL, colfun = NULL, add = FALSE, zlim =
       isLL <- FALSE
     }
   }
-  srcproj <- raster::projection(x)
+
   if (is.na(srcproj) && !is.null(crs)) {
     if (is.null(coords)) {
       stop("no projection defined on input raster, and no 'coords' provided - \n either set the CRS of the raster, or supply a two-layer 'coords' brick with longitude and latitude layers")
@@ -232,8 +280,10 @@ mesh_plot.quadmesh <- function(x, crs = NULL, colfun = NULL, add = FALSE, zlim =
   ## we also have to deal with any values that are NA
   ## because they propagate to destroy the id
   valx <- colMeans(matrix(qm$vb[3, qm$ib], nrow = 4L))
-  #cols <- colfun(100)[scl(valx) * 99 + 1]
-  cols <- if (is.null(zlim)) colfun(100)[scl(valx) * 99 + 1] else colfun(100)[scales::rescale(valx, c(1, 100), zlim)]
+
+
+  lc <- length(col)
+  cols <- if (is.null(zlim)) col[scales::rescale(valx, c(1, lc))] else col[scales::rescale(valx, c(1, lc), zlim)]
 
   if (any(is.na(cols))) {
     colsna <- rep(cols, each = nrow(ib))
