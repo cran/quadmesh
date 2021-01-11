@@ -77,7 +77,9 @@ mesh_plot(
   add = FALSE,
   zlim = NULL,
   ...,
-  coords = NULL
+  coords = NULL,
+  prefer_quad = TRUE,
+  breaks = NULL
 )
 }
 \arguments{
@@ -94,12 +96,19 @@ mesh_plot(
 \item{...}{passed through to \code{base::plot}}
 
 \item{coords}{optional input raster of coordinates of each cell, see details}
+
+\item{prefer_quad}{set to \code{TRUE} by default, if but may be \code{FALSE} to assume use of triangle rather than quad primitives -
+this covers the case for when a mesh3d object may have quads \emph{and} triangles in the same mesh}
+
+\item{breaks}{argument passed along to \code{\link[palr:image_pal]{palr::image_pal()}}}
 }
 \value{
 nothing, used for the side-effect of creating or adding to a plot
 }
 \description{
 Convert to a quadmesh and plot in efficient vectorized form using 'grid'.
+
+Plot mesh
 }
 \details{
 The mesh may be reprojected prior to plotting using the 'crs' argument to
@@ -115,9 +124,18 @@ modelled on the approach to curvilinear grid data used in the \code{angstroms} p
 the function \code{angstroms::romsmap()} and `angstroms::romscoords()`` are used to separate the complicated
 grid geometry from the grid data itself. A small fudge is applied to extend the coordinates
 by 1 cell to avoid losing any data due to the half cell outer margin (get in touch if this causes problems!).
+
+If 'color' is present on the object it is used. This can be overridden by
+using the 'col' argument, and controlled with 'zlim' and 'breaks' in the usual
+\code{\link[graphics:image]{graphics::image()}} way.
 }
 \examples{
-mesh_plot(worldll)
+##mesh_plot(worldll)
+## crop otherwise out of bounds from PROJ
 rr <- raster::crop(worldll, raster::extent(-179, 179, -89, 89))
 mesh_plot(rr, crs = "+proj=laea +datum=WGS84")
+mesh_plot(worldll, crs = "+proj=moll +datum=WGS84")
+prj <- "+proj=lcc +datum=WGS84 +lon_0=147 +lat_0=-40 +lat_1=-55 +lat_2=-20"
+mesh_plot(etopo, crs = prj, add = FALSE, col = grey(seq(0, 1, length = 20)))
+mesh_plot(rr, crs = prj, add = TRUE)
 }

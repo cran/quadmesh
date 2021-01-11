@@ -31,32 +31,45 @@ scl <- function(x) {
 #' @return nothing, used for the side-effect of creating or adding to a plot
 #' @export
 #' @importFrom scales rescale
-#' @importFrom grDevices colorRampPalette
+#' @importFrom grDevices hcl.colors colorRampPalette
 #' @examples
-#' mesh_plot(worldll)
+#' ##mesh_plot(worldll)
+#' ## crop otherwise out of bounds from PROJ
 #' rr <- raster::crop(worldll, raster::extent(-179, 179, -89, 89))
 #' mesh_plot(rr, crs = "+proj=laea +datum=WGS84")
+#' mesh_plot(worldll, crs = "+proj=moll +datum=WGS84")
+#' prj <- "+proj=lcc +datum=WGS84 +lon_0=147 +lat_0=-40 +lat_1=-55 +lat_2=-20"
+#' mesh_plot(etopo, crs = prj, add = FALSE, col = grey(seq(0, 1, length = 20)))
+#' mesh_plot(rr, crs = prj, add = TRUE)
 mesh_plot <- function(x, crs = NULL, col = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
-  message("quadmesh::mesh_plot() is to be deprecated\n a future release will use the 'anglr' package, soon to be on CRAN")
+  if ("colfun" %in% names(list(...))) {
+    stop("argument colfun is defunct, please use 'col' as per base plot")
+  }
   UseMethod("mesh_plot")
 }
 #' @name mesh_plot
 #' @export
 mesh_plot.BasicRaster <- function(x, crs = NULL, col = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
   if (raster::nlayers(x) > 1L) warning("extracting single RasterLayer from multilayered input")
-  mesh_plot(x[[1]], crs = crs, col = col, add = add, zlim = zlim, ..., coords = coords)
+  mesh_plot(x[[1L]], crs = crs, col = col, add = add, zlim = zlim, ..., coords = coords)
 }
 #debug <- TRUE
 #' @name mesh_plot
 #' @export
 mesh_plot.RasterLayer <- function(x, crs = NULL, col = NULL, add = FALSE, zlim = NULL, ..., coords = NULL) {
 
+  crs_wasnull <- FALSE
+  if (is.null(crs)) crs_wasnull <- TRUE
   if (add && is.null(crs)) crs <- use_crs()
   if (!is.null(crs)) use_crs(crs) else use_crs(raster::projection(x))
 
   qm <- quadmesh::quadmesh(x, na.rm = FALSE)
-
-  if (is.null(col)) col <- .hcl_colors
+  if (!is.null(coords) && is.na(qm$crs)) {
+    ## we need this otherwise no reprojection is done in the case where coords and crs are both given
+    qm$crs <- "+proj=longlat +datum=WGS84"  ## assume
+  }
+  if (is.null(col)) col <- hcl.colors(12, "YlOrRd",
+                                      rev = TRUE)
   ib <- qm$ib
   ## take the coordinates as given
   xy <- t(qm$vb[1:2, ])
@@ -66,8 +79,14 @@ mesh_plot.RasterLayer <- function(x, crs = NULL, col = NULL, add = FALSE, zlim =
     coords_fudge <- raster::setExtent(coords, raster::extent(coords) + raster::res(coords) )
     cells <- raster::cellFromXY(coords_fudge, xy)
     xy <- raster::extract(coords_fudge, cells)
+    if (!crs_wasnull && !.ok_ll(xy)) warning("'coords' do not look like longlat, so 'crs' arg won't work\n please see Details in '?quadmesh'")
+
   }
-  xy <- reproj::reproj(xy, target = use_crs(), source = qm$crs)
+
+  if (!is.na(use_crs()) && !is.na(qm$crs)) {
+
+   xy <- reproj::reproj(xy, target = use_crs(), source = qm$crs)
+  }
   ## as this affects the entire thing
   bad <- !is.finite(xy[,1]) | !is.finite(xy[,2])
   ## but we must identify the bad xy in the index
@@ -90,6 +109,7 @@ mesh_plot.RasterLayer <- function(x, crs = NULL, col = NULL, add = FALSE, zlim =
     id <- id[!bad2]
     cols <- cols[!is.na(cols)]
   }
+
   xx <- list(x = xx, y = yy, id = id, col = cols)
 ## if (isLL) 1/cos(mean(xx$y, na.rm = TRUE) * pi/180) else 1
   if (!add) {
@@ -172,7 +192,8 @@ mesh_plot.TRI <- function(x, crs = NULL, col = NULL, add = FALSE, zlim = NULL, .
   if (add && is.null(crs)) crs <- use_crs()
   if (!is.null(crs)) use_crs(crs) else use_crs(raster::projection(x))
 
-   if (is.null(col)) col <- .hcl_colors
+   if (is.null(col)) col <- grDevices::hcl.colors(12, "YlOrRd",
+                                      rev = TRUE)
   idx <- matrix(match(t(as.matrix(x$triangle[c(".vx0", ".vx1", ".vx2")])),
                      x$vertex$vertex_), nrow = 3)
   ## take the coordinates as given
@@ -239,7 +260,8 @@ mesh_plot.quadmesh <- function(x, crs = NULL, col = NULL, add = FALSE, zlim = NU
 
 
    qm <- x
-  if (is.null(col)) col <- .hcl_colors
+  if (is.null(col)) col <- hcl.colors(12, "YlOrRd",
+                                      rev = TRUE)
   ib <- qm$ib
   ## take the coordinates as given
   xy <- t(qm$vb[1:2, ])
